@@ -283,6 +283,7 @@
           document.getElementById('stepMatchingDesc').textContent = 'No matching template found';
 
           resultBox.className = 'result-card error';
+          const reasonMsg = data.detail || data.message || 'No matching identity found in student database.';
           resultBox.innerHTML = `
             <div class="result-badge-rejected">
               <span>✗</span> <span>IDENTITY NOT FOUND</span>
@@ -292,7 +293,10 @@
               <div style="font-size: 1.05rem; font-weight: 700; color: #FCA5A5; margin-bottom: 0.35rem;">
                 No matching student found.
               </div>
-              <div style="font-size: 0.88rem; color: var(--text-muted);">
+              <div style="font-size: 0.88rem; color: #E5E7EB; margin-bottom: 0.25rem;">
+                ${reasonMsg}
+              </div>
+              <div style="font-size: 0.82rem; color: var(--text-muted);">
                 Attendance was NOT marked.
               </div>
             </div>
