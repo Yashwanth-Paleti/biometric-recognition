@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Registration — Cloud Biometric Attendance</title>
+  <link rel="stylesheet" href="/static/css/portal.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="/attendance" class="nav-brand">
+      <div class="brand-icon">⚡</div>
+      <span>BioAttend Portal</span>
+    </a>
+    <div class="nav-links">
+      <a href="/attendance" class="nav-link">Kiosk Attendance</a>
+      <a href="/login" class="nav-link">Student Login</a>
+      <a href="/register" class="nav-link active nav-btn">Enroll Student</a>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    <div class="header-box">
+      <span class="header-tag">Biometric Enrollment</span>
+      <h1 class="header-title">Student Registration</h1>
+      <p class="header-desc">Create your student profile and enroll dual facial biometric templates for automated cloud attendance.</p>
+    </div>
+
+    <div style="max-width: 760px; margin: 0 auto;">
+      <div class="glass-card">
+        <div id="alertBox" style="display: none; padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; font-size: 0.92rem;"></div>
+
+        <form id="registerForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="name">Full Name *</label>
+              <input type="text" id="name" name="name" class="form-input" placeholder="e.g. Yashwanth Paleti" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="student_id">Student ID / Roll No *</label>
+              <input type="text" id="student_id" name="student_id" class="form-input" placeholder="e.g. YASH_001" required>
+            </div>
+
+            <div class="form-group form-full">
+              <label class="form-label" for="email">Institutional Email *</label>
+              <input type="email" id="email" name="email" class="form-input" placeholder="student@university.edu" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="password">Password (min 6 chars) *</label>
+              <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" minlength="6" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="confirm_password">Confirm Password *</label>
+              <input type="password" id="confirm_password" name="confirm_password" class="form-input" placeholder="••••••••" minlength="6" required>
+            </div>
+
+            <!-- Face Photo 1 -->
+            <div class="form-group">
+              <label class="form-label">Face Image 1 (Front View) *</label>
+              <div class="upload-dropzone" id="dropzone1">
+                <input type="file" id="image1" name="image1" accept="image/jpeg,image/png,image/webp" required>
+                <div class="upload-icon">📷</div>
+                <div class="upload-text" id="dropText1">Upload or drop Face Photo 1</div>
+                <img id="preview1" class="upload-preview" alt="Preview 1">
+              </div>
+            </div>
+
+            <!-- Face Photo 2 -->
+            <div class="form-group">
+              <label class="form-label">Face Image 2 (Angled / Alternate) *</label>
+              <div class="upload-dropzone" id="dropzone2">
+                <input type="file" id="image2" name="image2" accept="image/jpeg,image/png,image/webp" required>
+                <div class="upload-icon">📷</div>
+                <div class="upload-text" id="dropText2">Upload or drop Face Photo 2</div>
+                <img id="preview2" class="upload-preview" alt="Preview 2">
+              </div>
+            </div>
+
+            <div class="form-group form-full" style="margin-top: 1rem;">
+              <button type="submit" id="submitBtn" class="btn btn-primary btn-block">
+                <span>Complete Registration & Biometric Enrollment</span>
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <div style="text-align: center; margin-top: 1.5rem; font-size: 0.88rem; color: var(--text-muted);">
+          Already enrolled? <a href="/login" style="color: var(--primary); text-decoration: none; font-weight: 600;">Sign in to Student Dashboard</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/portal.js"></script>
+  <script>
+    // File preview handlers
+    function setupFilePreview(inputId, previewId, textId) {
+      const input = document.getElementById(inputId);
+      const preview = document.getElementById(previewId);
+      const text = document.getElementById(textId);
+
+      input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          text.textContent = file.name;
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            preview.src = event.target.result;
+            preview.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    setupFilePreview('image1', 'preview1', 'dropText1');
+    setupFilePreview('image2', 'preview2', 'dropText2');
+
+    // Registration Form Submit Handler
+    const form = document.getElementById('registerForm');
+    const alertBox = document.getElementById('alertBox');
+    const submitBtn = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertBox.style.display = 'none';
+
+      const pass = document.getElementById('password').value;
+      const confirmPass = document.getElementById('confirm_password').value;
+      if (pass !== confirmPass) {
+        alertBox.className = 'result-card error';
+        alertBox.style.display = 'block';
+        alertBox.textContent = 'Passwords do not match.';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>Processing Biometric Enrollment...</span>';
+
+      try {
+        const formData = new FormData(form);
+        const res = await fetch('/api/v1/students/register', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alertBox.className = 'result-card success';
+          alertBox.style.display = 'block';
+          alertBox.innerHTML = `<strong>Registration Successful!</strong> ${data.message} Redirecting to login...`;
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 1800);
+        } else {
+          alertBox.className = 'result-card error';
+          alertBox.style.display = 'block';
+          alertBox.textContent = data.detail || data.message || 'Registration failed.';
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<span>Complete Registration & Biometric Enrollment</span>';
+        }
+      } catch (err) {
+        alertBox.className = 'result-card error';
+        alertBox.style.display = 'block';
+        alertBox.textContent = 'Network or server error during registration.';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Complete Registration & Biometric Enrollment</span>';
+      }
+    });
+  </script>
+</body>
+</html>

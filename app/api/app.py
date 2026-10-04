@@ -1,15 +1,23 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
+from app.api.routes.attendance import router as attendance_router
 from app.api.routes.biometric import router as biometric_router
+from app.api.routes.frontend import router as frontend_router
 from app.api.routes.health import router as health_router
+from app.api.routes.students import router as students_router
 from app.api.schemas.biometric import ErrorResponse
 from app.biometric.exceptions import BiometricError
 from app.config.settings import settings
 from app.utils.logging import logger
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+STATIC_DIR = BASE_DIR / "static"
 
 
 @asynccontextmanager
@@ -82,9 +90,18 @@ def create_app() -> FastAPI:
             ).model_dump(),
         )
 
+    # Static files mounting
+    if STATIC_DIR.exists():
+        app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    # Frontend UI routes
+    app.include_router(frontend_router)
+
     # API v1 routes
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(biometric_router, prefix="/api/v1")
+    app.include_router(students_router, prefix="/api/v1")
+    app.include_router(attendance_router, prefix="/api/v1")
 
     return app
 

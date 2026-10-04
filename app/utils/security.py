@@ -134,3 +134,38 @@ async def get_current_admin(
         "role": role,
         "claims": payload,
     }
+
+
+async def get_current_student(
+    token: Optional[str] = Depends(oauth2_scheme),
+) -> dict[str, Any]:
+    """
+    FastAPI dependency validating student access token.
+    Ensures student-only endpoints are restricted to authenticated students.
+    """
+    if not token:
+        logger.warning("Access denied to student endpoint: Missing Bearer token.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Missing Bearer token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    payload = decode_access_token(token)
+    user_id: Optional[str] = payload.get("sub")
+    role: Optional[str] = payload.get("role")
+
+    if user_id is None or role != "student":
+        logger.warning(f"Access denied: Invalid student role for user '{user_id}' (role='{role}').")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions. Student access required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return {
+        "user_id": user_id,
+        "role": role,
+        "claims": payload,
+    }
+

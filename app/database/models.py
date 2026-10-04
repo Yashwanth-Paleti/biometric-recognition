@@ -4,12 +4,14 @@ from typing import Any
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
     Index,
     JSON,
     String,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import declarative_base, relationship
@@ -29,6 +31,8 @@ class UserModel(Base):
     name = Column(String(128), nullable=False)
     email = Column(String(255), nullable=True)
     status = Column(String(32), nullable=False, default="active", index=True)
+    password_hash = Column(String(255), nullable=True)
+    role = Column(String(32), nullable=False, default="student", index=True)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -47,9 +51,15 @@ class UserModel(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    attendance_records = relationship(
+        "AttendanceModel",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def __repr__(self) -> str:
-        return f"<UserModel(id='{self.id}', user_id='{self.user_id}', name='{self.name}')>"
+        return f"<UserModel(id='{self.id}', user_id='{self.user_id}', name='{self.name}', role='{self.role}')>"
 
 
 class BiometricTemplateModel(Base):
@@ -133,3 +143,49 @@ class AuthenticationLogModel(Base):
             f"<AuthenticationLogModel(id='{self.id}', user_id='{self.user_id}', "
             f"type='{self.verification_type}', result='{self.result}')>"
         )
+
+
+class AttendanceModel(Base):
+    """
+    SQLAlchemy ORM model for recording student biometric attendance events.
+    Enforces uniqueness per (user_id, attendance_date) to prevent duplicate
+    attendance records on the same calendar day.
+    """
+    __tablename__ = "attendance"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(
+        String(64),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    attendance_date = Column(Date, nullable=False, index=True)
+    marked_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True
+    )
+    status = Column(String(32), nullable=False, default="Present")
+    recognition_similarity = Column(Float, nullable=True)
+    recognition_distance = Column(Float, nullable=True)
+    device_id = Column(String(64), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+
+    user = relationship("UserModel", back_populates="attendance_records")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "attendance_date", name="uq_user_attendance_date"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<AttendanceModel(id='{self.id}', user_id='{self.user_id}', "
+            f"date='{self.attendance_date}', status='{self.status}')>"
+        )
+

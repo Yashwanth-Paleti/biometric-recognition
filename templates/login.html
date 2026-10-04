@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Login — Cloud Biometric Attendance</title>
+  <link rel="stylesheet" href="/static/css/portal.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="/attendance" class="nav-brand">
+      <div class="brand-icon">⚡</div>
+      <span>BioAttend Portal</span>
+    </a>
+    <div class="nav-links">
+      <a href="/attendance" class="nav-link">Kiosk Attendance</a>
+      <a href="/login" class="nav-link active">Student Login</a>
+      <a href="/register" class="nav-link nav-btn">Enroll Student</a>
+    </div>
+  </nav>
+
+  <main class="main-content" style="display: flex; align-items: center; justify-content: center;">
+    <div style="width: 100%; max-width: 440px;">
+      <div class="glass-card">
+        <div class="header-box" style="margin-bottom: 1.5rem;">
+          <span class="header-tag">Portal Access</span>
+          <h1 class="header-title" style="font-size: 1.6rem;">Student Login</h1>
+          <p class="header-desc">Enter your credentials to view attendance history.</p>
+        </div>
+
+        <div id="alertBox" style="display: none; padding: 0.9rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; font-size: 0.88rem;"></div>
+
+        <form id="loginForm">
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label class="form-label" for="identifier">Student ID or Email</label>
+            <input type="text" id="identifier" name="identifier" class="form-input" placeholder="e.g. YASH_001 or email" required autofocus>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label class="form-label" for="password">Password</label>
+            <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" required>
+          </div>
+
+          <button type="submit" id="submitBtn" class="btn btn-primary btn-block">
+            <span>Sign In to Dashboard</span>
+          </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 1.5rem; font-size: 0.88rem; color: var(--text-muted);">
+          Don't have a profile? <a href="/register" style="color: var(--primary); text-decoration: none; font-weight: 600;">Enroll Here</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/portal.js"></script>
+  <script>
+    const form = document.getElementById('loginForm');
+    const alertBox = document.getElementById('alertBox');
+    const submitBtn = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertBox.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>Verifying Credentials...</span>';
+
+      const identifier = document.getElementById('identifier').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch('/api/v1/students/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier, password })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.access_token) {
+          setAuthToken(data.access_token, {
+            student_id: data.student_id,
+            name: data.name,
+            role: data.role
+          });
+          window.location.href = '/dashboard';
+        } else {
+          alertBox.className = 'result-card error';
+          alertBox.style.display = 'block';
+          alertBox.textContent = data.detail || 'Authentication failed. Please check credentials.';
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<span>Sign In to Dashboard</span>';
+        }
+      } catch (err) {
+        alertBox.className = 'result-card error';
+        alertBox.style.display = 'block';
+        alertBox.textContent = 'Server communication error. Please try again.';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Sign In to Dashboard</span>';
+      }
+    });
+  </script>
+</body>
+</html>

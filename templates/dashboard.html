@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard — Cloud Biometric Attendance</title>
+  <link rel="stylesheet" href="/static/css/portal.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="/attendance" class="nav-brand">
+      <div class="brand-icon">⚡</div>
+      <span>BioAttend Portal</span>
+    </a>
+    <div class="nav-links">
+      <a href="/attendance" class="nav-link">Kiosk Attendance</a>
+      <a href="/dashboard" class="nav-link active">My Dashboard</a>
+      <button onclick="logoutStudent()" class="btn btn-primary" style="padding: 0.4rem 0.9rem; font-size: 0.85rem;">
+        Logout
+      </button>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    <!-- Header Banner -->
+    <div class="glass-card" style="margin-bottom: 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: gap: 1rem;">
+      <div>
+        <span class="header-tag">Academic Portal</span>
+        <h1 id="studentName" class="header-title" style="font-size: 1.8rem; margin-top: 0.25rem;">Loading...</h1>
+        <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem; color: var(--text-muted); font-size: 0.9rem;">
+          <span>ID: <strong id="studentId" style="color: #fff;">—</strong></span>
+          <span>•</span>
+          <span id="studentEmail">—</span>
+          <span>•</span>
+          <span class="badge-present" style="font-size: 0.72rem;">Active Student</span>
+        </div>
+      </div>
+      <div>
+        <a href="/attendance" class="btn btn-primary">
+          <span>Mark Attendance (Kiosk)</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Metrics Cards -->
+    <div class="dashboard-grid">
+      <div class="stat-card">
+        <div class="stat-label">Attendance Rate</div>
+        <div id="statPercentage" class="stat-value" style="color: var(--primary);">0%</div>
+        <div class="stat-sub">Minimum 75% required</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Sessions Present</div>
+        <div id="statPresent" class="stat-value" style="color: var(--success);">0</div>
+        <div class="stat-sub">Recorded face verifications</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Total Sessions</div>
+        <div id="statTotal" class="stat-value">0</div>
+        <div class="stat-sub">Academic days evaluated</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Last Attendance</div>
+        <div id="statLastTime" class="stat-value" style="font-size: 1.15rem; font-weight: 700; padding-top: 0.4rem;">Never</div>
+        <div class="stat-sub" id="statLastSub">No recent activity</div>
+      </div>
+    </div>
+
+    <!-- Attendance History Table -->
+    <div class="glass-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 700;">Biometric Verification Log</h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Cryptographically Audited Records</span>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Status</th>
+              <th>Similarity</th>
+              <th>L2 Distance</th>
+              <th>Capture Terminal</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                Fetching attendance history from cloud database...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/portal.js"></script>
+  <script>
+    async function loadDashboard() {
+      const token = getAuthToken();
+      if (!token) {
+        window.location.href = '/login';
+        return;
+      }
+
+      try {
+        const res = await apiFetch('/api/v1/students/attendance');
+        if (res.status === 401 || res.status === 403) {
+          logoutStudent();
+          return;
+        }
+
+        const data = await res.json();
+        
+        // Populate profile
+        document.getElementById('studentName').textContent = data.name || 'Student';
+        document.getElementById('studentId').textContent = data.student_id;
+        document.getElementById('studentEmail').textContent = data.email || 'No email registered';
+
+        // Populate metrics
+        document.getElementById('statPercentage').textContent = `${data.attendance_percentage}%`;
+        document.getElementById('statPresent').textContent = data.present_count;
+        document.getElementById('statTotal').textContent = data.total_sessions;
+        
+        if (data.last_attendance) {
+          document.getElementById('statLastTime').textContent = data.last_attendance;
+          document.getElementById('statLastSub').textContent = 'Confirmed present';
+        } else {
+          document.getElementById('statLastTime').textContent = 'Never';
+          document.getElementById('statLastSub').textContent = 'No records found';
+        }
+
+        // Populate table
+        const tbody = document.getElementById('historyTableBody');
+        tbody.innerHTML = '';
+
+        if (!data.history || data.history.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
+                No attendance records found. Visit the <a href="/attendance" style="color: var(--primary);">Kiosk</a> to mark your attendance!
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        data.history.forEach((item) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td><strong>${item.date}</strong></td>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.86rem;">${item.time}</td>
+            <td><span class="badge-present">✓ ${item.status}</span></td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: var(--text-muted);">${item.similarity !== null ? item.similarity.toFixed(4) : '—'}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: var(--text-muted);">${item.distance !== null ? item.distance.toFixed(4) : '—'}</td>
+            <td style="font-size: 0.85rem; color: var(--text-subtle);">${item.device_id || 'KIOSK_MAIN'}</td>
+          `;
+          tbody.appendChild(row);
+        });
+
+      } catch (err) {
+        console.error('Error loading dashboard:', err);
+        document.getElementById('historyTableBody').innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--error); padding: 2rem;">
+              Failed to load attendance records. Please refresh or sign in again.
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadDashboard);
+  </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiosk Terminal — Cloud Biometric Attendance</title>
+  <link rel="stylesheet" href="/static/css/portal.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="/attendance" class="nav-brand">
+      <div class="brand-icon">⚡</div>
+      <span>BioAttend Portal</span>
+    </a>
+    <div class="nav-links">
+      <a href="/attendance" class="nav-link active">Kiosk Attendance</a>
+      <a href="/login" class="nav-link">Student Login</a>
+      <a href="/register" class="nav-link nav-btn">Enroll Student</a>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    <div class="header-box">
+      <span class="header-tag">Live Recognition Terminal</span>
+      <h1 class="header-title">Common Attendance Kiosk</h1>
+      <p class="header-desc">Position your face inside the target reticle to perform instant anti-spoofing validation and cloud biometric identification.</p>
+    </div>
+
+    <div class="kiosk-grid">
+      <!-- Camera Column -->
+      <div class="glass-card" style="padding: 1.5rem;">
+        <div class="camera-container">
+          <video id="webcam" class="camera-video" autoplay playsinline muted></video>
+          <div class="camera-overlay">
+            <div id="reticle" class="face-reticle"></div>
+          </div>
+          <canvas id="snapshotCanvas" style="display: none;"></canvas>
+        </div>
+
+        <div style="margin-top: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem;">
+          <button id="markBtn" class="btn btn-primary btn-block" style="font-size: 1.05rem; padding: 1rem;">
+            <span>📸 MARK ATTENDANCE</span>
+          </button>
+
+          <!-- Fallback Upload Option -->
+          <div style="text-align: center; margin-top: 0.5rem;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); cursor: pointer;">
+              Camera unavailable? <span style="color: var(--primary); text-decoration: underline;">Upload Probe Image Instead</span>
+              <input type="file" id="fallbackFileInput" accept="image/jpeg,image/png,image/webp" style="display: none;">
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Pipeline & Status Column -->
+      <div>
+        <div class="glass-card">
+          <h2 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem;">Processing Pipeline</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Real-time presentation attack detection & pgvector matching</p>
+
+          <div class="status-pipeline">
+            <div id="stepCamera" class="status-step active">
+              <div class="status-step-icon">1</div>
+              <div>
+                <div style="font-weight: 600; font-size: 0.9rem;">Optical Camera Probe</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted);" id="stepCameraDesc">Live video stream active</div>
+              </div>
+            </div>
+
+            <div id="stepLiveness" class="status-step">
+              <div class="status-step-icon">2</div>
+              <div>
+                <div style="font-weight: 600; font-size: 0.9rem;">Liveness & Anti-Spoofing</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted);" id="stepLivenessDesc">Waiting for capture...</div>
+              </div>
+            </div>
+
+            <div id="stepMatching" class="status-step">
+              <div class="status-step-icon">3</div>
+              <div>
+                <div style="font-weight: 600; font-size: 0.9rem;">InsightFace 512-D pgvector Search</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted);" id="stepMatchingDesc">Waiting for inference...</div>
+              </div>
+            </div>
+
+            <div id="stepLedger" class="status-step">
+              <div class="status-step-icon">4</div>
+              <div>
+                <div style="font-weight: 600; font-size: 0.9rem;">Attendance Ledger Commitment</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted);" id="stepLedgerDesc">Same-day duplicate protection</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Result Box -->
+          <div id="resultBox" class="result-card"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/portal.js"></script>
+  <script>
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('snapshotCanvas');
+    const markBtn = document.getElementById('markBtn');
+    const reticle = document.getElementById('reticle');
+    const resultBox = document.getElementById('resultBox');
+    const fallbackFileInput = document.getElementById('fallbackFileInput');
+
+    const stepCamera = document.getElementById('stepCamera');
+    const stepLiveness = document.getElementById('stepLiveness');
+    const stepMatching = document.getElementById('stepMatching');
+    const stepLedger = document.getElementById('stepLedger');
+
+    const cameraManager = new CameraManager(video, canvas);
+
+    // Initialize Camera on load
+    window.addEventListener('DOMContentLoaded', async () => {
+      const active = await cameraManager.start();
+      if (!active) {
+        document.getElementById('stepCameraDesc').textContent = 'Webcam unavailable. Use image upload below.';
+        stepCamera.className = 'status-step';
+      }
+    });
+
+    function resetPipeline() {
+      stepLiveness.className = 'status-step';
+      document.getElementById('stepLivenessDesc').textContent = 'Waiting for capture...';
+      stepMatching.className = 'status-step';
+      document.getElementById('stepMatchingDesc').textContent = 'Waiting for inference...';
+      stepLedger.className = 'status-step';
+      document.getElementById('stepLedgerDesc').textContent = 'Same-day duplicate protection';
+      reticle.className = 'face-reticle';
+      resultBox.style.display = 'none';
+      resultBox.innerHTML = '';
+    }
+
+    async function processAttendance(imageBlob) {
+      resetPipeline();
+      markBtn.disabled = true;
+      markBtn.innerHTML = '<span>Processing Recognition...</span>';
+      reticle.className = 'face-reticle scanning';
+
+      // Step 2: Liveness
+      stepLiveness.className = 'status-step active';
+      document.getElementById('stepLivenessDesc').textContent = 'Checking texture & frequency domain PAD...';
+
+      // Prepare form data
+      const formData = new FormData();
+      formData.append('image', imageBlob, 'kiosk_probe.jpg');
+      formData.append('device_id', 'KIOSK_TERMINAL_01');
+
+      try {
+        // Step 3: Server inference
+        setTimeout(() => {
+          stepLiveness.className = 'status-step completed';
+          stepMatching.className = 'status-step active';
+          document.getElementById('stepMatchingDesc').textContent = 'Generating 512-D vector & querying HNSW index...';
+        }, 300);
+
+        const res = await fetch('/api/v1/attendance/mark', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        reticle.className = 'face-reticle';
+
+        if (res.ok && data.success) {
+          // Success
+          stepMatching.className = 'status-step completed';
+          stepLedger.className = 'status-step completed';
+          document.getElementById('stepLedgerDesc').textContent = 'Recorded in PostgreSQL';
+          reticle.className = 'face-reticle active';
+
+          const timeStr = data.marked_at ? new Date(data.marked_at).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+          resultBox.className = 'result-card success';
+          resultBox.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <span style="font-size: 1.5rem; color: var(--success);">✓</span>
+              <div>
+                <strong style="font-size: 1.15rem; color: #fff;">Attendance Marked</strong>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">${timeStr}</div>
+              </div>
+            </div>
+            <div style="background: rgba(0, 0, 0, 0.25); padding: 0.85rem; border-radius: var(--radius-sm); margin-top: 0.5rem;">
+              <div style="font-size: 1.1rem; font-weight: 700; color: #fff;">${data.name}</div>
+              <div style="font-size: 0.85rem; color: var(--text-muted);">Student ID: <span style="color: #A5B4FC;">${data.user_id}</span></div>
+              <div style="margin-top: 0.5rem; display: flex; gap: 1rem; font-size: 0.78rem; font-family: 'JetBrains Mono', monospace; color: var(--text-subtle);">
+                <span>Sim: ${data.similarity ? data.similarity.toFixed(4) : '—'}</span>
+                <span>Dist: ${data.distance ? data.distance.toFixed(4) : '—'}</span>
+              </div>
+            </div>
+          `;
+        } else if (data.already_marked) {
+          // Duplicate Attendance Notice
+          stepMatching.className = 'status-step completed';
+          stepLedger.className = 'status-step completed';
+          document.getElementById('stepLedgerDesc').textContent = 'Already verified today';
+
+          const timeStr = data.marked_at ? new Date(data.marked_at).toLocaleTimeString() : 'Earlier today';
+
+          resultBox.className = 'result-card warning';
+          resultBox.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+              <span style="font-size: 1.4rem; color: var(--warning);">ℹ</span>
+              <div>
+                <strong style="color: #fff; font-size: 1.05rem;">Attendance Already Marked Today</strong>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">${data.name} (${data.user_id})</div>
+              </div>
+            </div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.4rem;">
+              First recorded at: <strong>${timeStr}</strong>. Duplicate attendances on the same day are ignored.
+            </div>
+          `;
+        } else {
+          // Rejection or Not Found
+          stepMatching.className = 'status-step';
+          stepLedger.className = 'status-step';
+          document.getElementById('stepMatchingDesc').textContent = 'No matching template found';
+
+          resultBox.className = 'result-card error';
+          resultBox.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <span style="font-size: 1.4rem; color: var(--error);">✗</span>
+              <div>
+                <strong style="color: #fff;">Recognition Failed</strong>
+                <div style="font-size: 0.84rem; color: #FCA5A5; margin-top: 0.2rem;">${data.detail || data.message || 'Face unrecognized.'}</div>
+              </div>
+            </div>
+          `;
+        }
+      } catch (err) {
+        console.error('Error during attendance marking:', err);
+        resultBox.className = 'result-card error';
+        resultBox.innerHTML = `<strong>Error:</strong> Failed to communicate with biometric server.`;
+      } finally {
+        markBtn.disabled = false;
+        markBtn.innerHTML = '<span>📸 MARK ATTENDANCE</span>';
+      }
+    }
+
+    // Capture button click
+    markBtn.addEventListener('click', async () => {
+      if (video.videoWidth > 0) {
+        const blob = await cameraManager.captureBlob();
+        processAttendance(blob);
+      } else {
+        fallbackFileInput.click();
+      }
+    });
+
+    // File input fallback
+    fallbackFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        processAttendance(file);
+      }
+    });
+  </script>
+</body>
+</html>

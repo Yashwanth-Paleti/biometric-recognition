@@ -16,6 +16,8 @@ rate_limit_verify = RateLimiter("verify", times=settings.rate_limit_verify_per_m
 rate_limit_identify = RateLimiter("identify", times=settings.rate_limit_identify_per_minute, seconds=60)
 rate_limit_enroll = RateLimiter("enroll", times=settings.rate_limit_enroll_per_minute, seconds=60)
 rate_limit_token = RateLimiter("token", times=20, seconds=60)
+rate_limit_attendance = RateLimiter("attendance", times=60, seconds=60)
+rate_limit_student_auth = RateLimiter("student_auth", times=30, seconds=60)
 
 # Maximum permissible image payload size: 10 MB
 MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
