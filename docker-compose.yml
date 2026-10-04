@@ -31,15 +31,22 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - APP_ENV=development
+      - APP_ENV=production
       - BIOMETRIC_STORAGE=postgres
       - DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/biometrics
       - BIOMETRIC_MATCH_THRESHOLD=0.85
       - MODEL_NAME=buffalo_l
       - MODEL_VERSION=1.0.0
       - LOG_LEVEL=INFO
+      - LIVENESS_ENABLED=true
+      - LIVENESS_THRESHOLD=0.40
+      - RATE_LIMIT_ENABLED=true
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-insecure-default-secret-key-change-in-production-min32}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-AdminPass123!}
     command: >
-      sh -c "alembic upgrade head && uvicorn app.api.app:app --host 0.0.0.0 --port 8000"
+      sh -c "alembic upgrade head && uvicorn app.api.app:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips '*'"
+
 
 volumes:
   pgdata:
