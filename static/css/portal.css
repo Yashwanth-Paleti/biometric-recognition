@@ -467,6 +467,146 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Result Card Enhanced Styles */
+.result-badge-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #34D399;
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+  margin-bottom: 0.85rem;
+}
+
+.result-badge-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #FBBF24;
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+  margin-bottom: 0.85rem;
+}
+
+.result-badge-rejected {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #F87171;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+  margin-bottom: 0.85rem;
+}
+
+.result-identity-block {
+  margin-bottom: 0.75rem;
+}
+
+.result-student-name {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.result-student-id {
+  font-size: 0.95rem;
+  color: #A5B4FC;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.result-department {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-top: 0.15rem;
+}
+
+.result-status-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 0.85rem 0;
+}
+
+.result-attendance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.result-attendance-status {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #34D399;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.result-timestamp {
+  font-size: 0.9rem;
+  color: #E0E7FF;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.result-metrics-row {
+  display: flex;
+  gap: 1.25rem;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.result-metric {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.metric-val {
+  color: #E0E7FF;
+  font-weight: 600;
+}
+
+.result-dashboard-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.85rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #A5B4FC;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.result-dashboard-link:hover {
+  color: #FFFFFF;
+  transform: translateX(2px);
+}
+
 /* Dashboard Metrics Grid */
 .dashboard-grid {
   display: grid;

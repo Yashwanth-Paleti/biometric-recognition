@@ -178,6 +178,12 @@
     }
 
     document.addEventListener('DOMContentLoaded', loadDashboard);
+    window.addEventListener('focus', loadDashboard);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        loadDashboard();
+      }
+    });
   </script>
 </body>
 </html>

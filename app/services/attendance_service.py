@@ -53,6 +53,7 @@ class AttendanceService:
                 "authenticated": False,
                 "user_id": None,
                 "name": None,
+                "department": None,
                 "status": None,
                 "message": auth_result.message or "No matching identity found for face capture.",
                 "already_marked": False,
@@ -64,6 +65,14 @@ class AttendanceService:
         student_id = auth_result.user_id
         student = db.query(UserModel).filter(UserModel.user_id == student_id).first()
         student_name = student.name if student else student_id
+
+        # Determine department (from template metadata or default academic department)
+        department = "CSE – Data Science"
+        if student and hasattr(student, "templates") and student.templates:
+            for tmpl in student.templates:
+                if tmpl.metadata_json and isinstance(tmpl.metadata_json, dict) and "department" in tmpl.metadata_json:
+                    department = tmpl.metadata_json["department"]
+                    break
 
         # Determine current date (UTC)
         now_utc = datetime.now(timezone.utc)
@@ -84,6 +93,7 @@ class AttendanceService:
                 "authenticated": True,
                 "user_id": student_id,
                 "name": student_name,
+                "department": department,
                 "status": existing_record.status,
                 "message": "Attendance already marked today.",
                 "already_marked": True,
@@ -115,6 +125,7 @@ class AttendanceService:
                 "authenticated": True,
                 "user_id": student_id,
                 "name": student_name,
+                "department": department,
                 "status": "Present",
                 "message": f"Attendance marked successfully for {student_name}.",
                 "already_marked": False,

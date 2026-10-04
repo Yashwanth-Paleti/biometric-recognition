@@ -169,66 +169,131 @@
         reticle.className = 'face-reticle';
 
         if (res.ok && data.success) {
-          // Success
+          // Success: Identity Verified and Attendance Marked
           stepMatching.className = 'status-step completed';
           stepLedger.className = 'status-step completed';
           document.getElementById('stepLedgerDesc').textContent = 'Recorded in PostgreSQL';
           reticle.className = 'face-reticle active';
 
-          const timeStr = data.marked_at ? new Date(data.marked_at).toLocaleTimeString() : new Date().toLocaleTimeString();
+          const timeStr = data.marked_at 
+            ? new Date(data.marked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const simPercent = (data.similarity !== null && data.similarity !== undefined)
+            ? (data.similarity * 100).toFixed(2) + '%'
+            : '—';
+          const distVal = (data.distance !== null && data.distance !== undefined)
+            ? data.distance.toFixed(4)
+            : '—';
+          const deptStr = data.department || 'CSE – Data Science';
 
           resultBox.className = 'result-card success';
           resultBox.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
-              <span style="font-size: 1.5rem; color: var(--success);">✓</span>
-              <div>
-                <strong style="font-size: 1.15rem; color: #fff;">Attendance Marked</strong>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">${timeStr}</div>
+            <div class="result-badge-verified">
+              <span>✓</span> <span>IDENTITY VERIFIED</span>
+            </div>
+
+            <div class="result-identity-block">
+              <div class="result-student-name">${data.name}</div>
+              <div class="result-student-id">Student ID: <strong>${data.user_id}</strong></div>
+              <div class="result-department">${deptStr}</div>
+            </div>
+
+            <div class="result-status-divider"></div>
+
+            <div class="result-attendance-row">
+              <div class="result-attendance-status">
+                <span>✓</span> <span>Attendance Marked</span>
+              </div>
+              <div class="result-timestamp">${timeStr}</div>
+            </div>
+
+            <div class="result-metrics-row">
+              <div class="result-metric">
+                <span class="metric-label">Similarity:</span>
+                <span class="metric-val">${simPercent}</span>
+              </div>
+              <div class="result-metric">
+                <span class="metric-label">Distance:</span>
+                <span class="metric-val">${distVal}</span>
               </div>
             </div>
-            <div style="background: rgba(0, 0, 0, 0.25); padding: 0.85rem; border-radius: var(--radius-sm); margin-top: 0.5rem;">
-              <div style="font-size: 1.1rem; font-weight: 700; color: #fff;">${data.name}</div>
-              <div style="font-size: 0.85rem; color: var(--text-muted);">Student ID: <span style="color: #A5B4FC;">${data.user_id}</span></div>
-              <div style="margin-top: 0.5rem; display: flex; gap: 1rem; font-size: 0.78rem; font-family: 'JetBrains Mono', monospace; color: var(--text-subtle);">
-                <span>Sim: ${data.similarity ? data.similarity.toFixed(4) : '—'}</span>
-                <span>Dist: ${data.distance ? data.distance.toFixed(4) : '—'}</span>
-              </div>
-            </div>
+
+            <a href="/dashboard" class="result-dashboard-link">
+              <span>View Updated Dashboard</span> <span>→</span>
+            </a>
           `;
         } else if (data.already_marked) {
-          // Duplicate Attendance Notice
+          // Identity Verified, but duplicate attendance prevented
           stepMatching.className = 'status-step completed';
           stepLedger.className = 'status-step completed';
           document.getElementById('stepLedgerDesc').textContent = 'Already verified today';
+          reticle.className = 'face-reticle active';
 
-          const timeStr = data.marked_at ? new Date(data.marked_at).toLocaleTimeString() : 'Earlier today';
+          const timeStr = data.marked_at 
+            ? new Date(data.marked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : 'Earlier Today';
+          const simPercent = (data.similarity !== null && data.similarity !== undefined)
+            ? (data.similarity * 100).toFixed(2) + '%'
+            : '—';
+          const distVal = (data.distance !== null && data.distance !== undefined)
+            ? data.distance.toFixed(4)
+            : '—';
+          const deptStr = data.department || 'CSE – Data Science';
 
           resultBox.className = 'result-card warning';
           resultBox.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-              <span style="font-size: 1.4rem; color: var(--warning);">ℹ</span>
-              <div>
-                <strong style="color: #fff; font-size: 1.05rem;">Attendance Already Marked Today</strong>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">${data.name} (${data.user_id})</div>
+            <div class="result-badge-warning">
+              <span>✓</span> <span>IDENTITY VERIFIED</span>
+            </div>
+
+            <div class="result-identity-block">
+              <div class="result-student-name">${data.name}</div>
+              <div class="result-student-id">Student ID: <strong>${data.user_id}</strong></div>
+              <div class="result-department">${deptStr}</div>
+            </div>
+
+            <div class="result-status-divider"></div>
+
+            <div class="result-attendance-row">
+              <div class="result-attendance-status" style="color: #FBBF24;">
+                <span>ℹ</span> <span>Attendance Already Marked Today</span>
+              </div>
+              <div class="result-timestamp">${timeStr}</div>
+            </div>
+
+            <div class="result-metrics-row">
+              <div class="result-metric">
+                <span class="metric-label">Similarity:</span>
+                <span class="metric-val">${simPercent}</span>
+              </div>
+              <div class="result-metric">
+                <span class="metric-label">Distance:</span>
+                <span class="metric-val">${distVal}</span>
               </div>
             </div>
-            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.4rem;">
-              First recorded at: <strong>${timeStr}</strong>. Duplicate attendances on the same day are ignored.
-            </div>
+
+            <a href="/dashboard" class="result-dashboard-link">
+              <span>View Dashboard Records</span> <span>→</span>
+            </a>
           `;
         } else {
-          // Rejection or Not Found
+          // Unknown face or presentation attack rejection
           stepMatching.className = 'status-step';
           stepLedger.className = 'status-step';
           document.getElementById('stepMatchingDesc').textContent = 'No matching template found';
 
           resultBox.className = 'result-card error';
           resultBox.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <span style="font-size: 1.4rem; color: var(--error);">✗</span>
-              <div>
-                <strong style="color: #fff;">Recognition Failed</strong>
-                <div style="font-size: 0.84rem; color: #FCA5A5; margin-top: 0.2rem;">${data.detail || data.message || 'Face unrecognized.'}</div>
+            <div class="result-badge-rejected">
+              <span>✗</span> <span>IDENTITY NOT FOUND</span>
+            </div>
+
+            <div class="result-identity-block">
+              <div style="font-size: 1.05rem; font-weight: 700; color: #FCA5A5; margin-bottom: 0.35rem;">
+                No matching student found.
+              </div>
+              <div style="font-size: 0.88rem; color: var(--text-muted);">
+                Attendance was NOT marked.
               </div>
             </div>
           `;

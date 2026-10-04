@@ -69,9 +69,11 @@ class AttendanceMarkResponse(BaseModel):
     authenticated: bool = Field(description="True if face was identified against enrolled database")
     user_id: Optional[str] = Field(default=None, description="Identified student ID")
     name: Optional[str] = Field(default=None, description="Identified student name")
+    department: Optional[str] = Field(default=None, description="Student department or academic program")
     status: Optional[str] = Field(default=None, description="Attendance status (e.g. 'Present')")
     message: str = Field(description="Detailed result message")
     marked_at: Optional[str] = Field(default=None, description="ISO-8601 timestamp of attendance")
     already_marked: bool = Field(default=False, description="True if attendance was already recorded today")
     similarity: Optional[float] = Field(default=None, description="Biometric similarity score")
     distance: Optional[float] = Field(default=None, description="Biometric distance score")
+
