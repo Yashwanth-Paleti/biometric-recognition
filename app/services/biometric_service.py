@@ -6,10 +6,12 @@ from app.biometric.exceptions import (
     BiometricError,
     EmbeddingExtractionError,
     InvalidImageError,
+    LivenessCheckFailedError,
     MultipleFacesDetectedError,
     NoFaceDetectedError,
 )
 from app.biometric.face_engine import FaceEngine
+from app.biometric.liveness import BaseLivenessDetector, get_liveness_detector
 from app.biometric.matching import FaceMatcher
 from app.config.settings import settings
 from app.models.biometric import AuthenticationResult, BiometricTemplate, User
@@ -21,8 +23,8 @@ from app.utils.logging import logger
 class BiometricService:
     """
     Core Domain Service for Biometric Authentication.
-    Orchestrates FaceEngine, FaceMatcher, and BiometricRepository to provide
-    structured, high-level verification, identification, and enrollment workflows.
+    Orchestrates FaceEngine, FaceMatcher, LivenessDetector, and BiometricRepository
+    to provide structured, high-level verification, identification, and enrollment workflows.
     """
 
     def __init__(
@@ -30,10 +32,12 @@ class BiometricService:
         engine: Optional[FaceEngine] = None,
         matcher: Optional[FaceMatcher] = None,
         repository: Optional[BiometricRepository] = None,
+        liveness_detector: Optional[BaseLivenessDetector] = None,
     ):
         self.engine = engine or FaceEngine()
         self.matcher = matcher or FaceMatcher()
         self.repository = repository or get_biometric_repository()
+        self.liveness_detector = liveness_detector or get_liveness_detector()
 
     def extract_embedding(
         self,
@@ -71,17 +75,52 @@ class BiometricService:
         logger.info(f"Enrollment initiated for user: {user_id}")
 
         try:
-            embedding = self.engine.generate_embedding_from_image(
-                image_input,
-                require_single_face=settings.enforce_single_face_enrollment,
-            )
+            rgb_image = self.engine.process_image(image_input)
+            faces = self.engine.detect_faces(rgb_image)
+
+            if len(faces) == 0:
+                raise NoFaceDetectedError()
+
+            if settings.enforce_single_face_enrollment and len(faces) > 1:
+                raise MultipleFacesDetectedError(
+                    f"Detected {len(faces)} faces. Exactly 1 face is required for this operation."
+                )
+
+            primary_face = faces[0]
+            liveness = self.liveness_detector.evaluate(rgb_image, primary_face)
+            if not liveness.passed:
+                logger.warning(
+                    f"Enrollment rejected for user {user_id}: Liveness check failed "
+                    f"(score={liveness.score:.4f}, method={liveness.method})"
+                )
+                return AuthenticationResult(
+                    success=False,
+                    matched=False,
+                    user_id=user_id,
+                    error_code="LIVENESS_CHECK_FAILED",
+                    message="Biometric enrollment rejected: Presentation attack detected (liveness check failed).",
+                    metadata={
+                        "liveness_passed": False,
+                        "liveness_score": round(liveness.score, 4),
+                        "liveness_method": liveness.method,
+                    },
+                )
+
+            embedding = self.engine.generate_embedding(primary_face)
+
+            meta = dict(metadata or {})
+            meta.update({
+                "liveness_passed": True,
+                "liveness_score": round(liveness.score, 4),
+                "liveness_method": liveness.method,
+            })
 
             template = BiometricTemplate(
                 user_id=user_id,
                 embedding=embedding,
                 model_name=settings.model_name,
                 model_version=settings.model_version,
-                metadata=metadata or {},
+                metadata=meta,
             )
 
             self.repository.save_template(template)
@@ -92,7 +131,7 @@ class BiometricService:
                 matched=True,
                 user_id=user_id,
                 message=f"Biometric template successfully enrolled for user '{user_id}'.",
-                metadata={"template_id": template.template_id, **(metadata or {})},
+                metadata={"template_id": template.template_id, **meta},
             )
 
         except NoFaceDetectedError:
@@ -207,14 +246,60 @@ class BiometricService:
             )
 
         try:
-            query_embedding = self.engine.generate_embedding_from_image(
-                image_input, require_single_face=False
-            )
+            rgb_image = self.engine.process_image(image_input)
+            faces = self.engine.detect_faces(rgb_image)
+
+            if len(faces) == 0:
+                raise NoFaceDetectedError()
+
+            primary_face = faces[0]
+            if len(faces) > 1:
+                def box_area(f: Any) -> float:
+                    bbox = getattr(f, "bbox", [0, 0, 0, 0])
+                    return (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+                primary_face = max(faces, key=box_area)
+
+            # Liveness evaluation BEFORE final biometric verification
+            liveness = self.liveness_detector.evaluate(rgb_image, primary_face)
+            if not liveness.passed:
+                logger.warning(
+                    f"Verification rejected for user '{user_id}': Liveness check failed "
+                    f"(score={liveness.score:.4f}, method={liveness.method})"
+                )
+                self._log_auth(
+                    user_id=user_id,
+                    verification_type="1:1_VERIFICATION",
+                    result="FAILURE",
+                    threshold=t,
+                    error_code="LIVENESS_CHECK_FAILED",
+                    device_id=device_id,
+                )
+                return AuthenticationResult(
+                    success=False,
+                    matched=False,
+                    user_id=user_id,
+                    threshold=t,
+                    error_code="LIVENESS_CHECK_FAILED",
+                    message="Biometric authentication rejected: Presentation attack detected (liveness check failed).",
+                    metadata={
+                        "liveness_passed": False,
+                        "liveness_score": round(liveness.score, 4),
+                        "liveness_method": liveness.method,
+                    },
+                )
+
+            query_embedding = self.engine.generate_embedding(primary_face)
 
             # Compare probe against all enrolled templates for this user; pick closest
             best_match, best_sim, best_dist = self.matcher.find_best_match(
                 query_embedding, stored_templates, threshold=t
             )
+
+            auth_meta = {
+                "liveness_passed": True,
+                "liveness_score": round(liveness.score, 4),
+                "liveness_method": liveness.method,
+            }
 
             if best_match is not None:
                 logger.info(
@@ -238,7 +323,7 @@ class BiometricService:
                     distance=best_dist,
                     threshold=t,
                     message=f"Identity verified for user '{user_id}'.",
-                    metadata=best_match.metadata,
+                    metadata={**best_match.metadata, **auth_meta},
                 )
             else:
                 logger.info(
@@ -356,9 +441,49 @@ class BiometricService:
         logger.info(f"1:N Identification attempted (threshold={t})")
 
         try:
-            query_embedding = self.engine.generate_embedding_from_image(
-                image_input, require_single_face=False
-            )
+            rgb_image = self.engine.process_image(image_input)
+            faces = self.engine.detect_faces(rgb_image)
+
+            if len(faces) == 0:
+                raise NoFaceDetectedError()
+
+            primary_face = faces[0]
+            if len(faces) > 1:
+                def box_area(f: Any) -> float:
+                    bbox = getattr(f, "bbox", [0, 0, 0, 0])
+                    return (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+                primary_face = max(faces, key=box_area)
+
+            # Liveness evaluation BEFORE 1:N biometric search
+            liveness = self.liveness_detector.evaluate(rgb_image, primary_face)
+            if not liveness.passed:
+                logger.warning(
+                    f"Identification rejected: Liveness check failed "
+                    f"(score={liveness.score:.4f}, method={liveness.method})"
+                )
+                self._log_auth(
+                    user_id=None,
+                    verification_type="1:N_IDENTIFICATION",
+                    result="FAILURE",
+                    threshold=t,
+                    error_code="LIVENESS_CHECK_FAILED",
+                    device_id=device_id,
+                )
+                return AuthenticationResult(
+                    success=False,
+                    matched=False,
+                    user_id=None,
+                    threshold=t,
+                    error_code="LIVENESS_CHECK_FAILED",
+                    message="Biometric identification rejected: Presentation attack detected (liveness check failed).",
+                    metadata={
+                        "liveness_passed": False,
+                        "liveness_score": round(liveness.score, 4),
+                        "liveness_method": liveness.method,
+                    },
+                )
+
+            query_embedding = self.engine.generate_embedding(primary_face)
 
             # Use native pgvector similarity search if repository provides find_nearest_template
             if hasattr(self.repository, "find_nearest_template"):

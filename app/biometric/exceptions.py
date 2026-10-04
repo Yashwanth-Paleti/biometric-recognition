@@ -36,3 +36,18 @@ class ModelInitializationError(BiometricError):
     """Raised when the deep learning inference engine fails to initialize."""
     def __init__(self, message: str = "Failed to initialize biometric model."):
         super().__init__(message, error_code="MODEL_INIT_FAILED")
+
+
+class LivenessCheckFailedError(BiometricError):
+    """
+    Raised when presentation attack detection (PAD) detects an artificial spoof
+    (e.g., printed photograph, digital screen replay, blurred replay attack).
+    """
+    def __init__(
+        self,
+        message: str = "Presentation attack detected: Liveness verification failed.",
+        score: float = 0.0,
+    ):
+        super().__init__(message, error_code="LIVENESS_CHECK_FAILED")
+        self.score = score
+

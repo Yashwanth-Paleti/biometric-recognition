@@ -37,6 +37,42 @@ class Settings(BaseModel):
     enforce_single_face_enrollment: bool = Field(
         default_factory=lambda: os.getenv("ENFORCE_SINGLE_FACE_ENROLLMENT", "true").lower() in ("true", "1")
     )
+
+    # Liveness / Presentation Attack Detection (Stage 3)
+    liveness_enabled: bool = Field(
+        default_factory=lambda: os.getenv("LIVENESS_ENABLED", "true").lower() in ("true", "1")
+    )
+    liveness_threshold: float = Field(
+        default_factory=lambda: float(os.getenv("LIVENESS_THRESHOLD", "0.40"))
+    )
+    liveness_method: str = Field(
+        default_factory=lambda: os.getenv("LIVENESS_METHOD", "passive_texture_frequency_v1")
+    )
+
+    # JWT Authentication & Authorization (Stage 3)
+    jwt_secret_key: str = Field(
+        default_factory=lambda: os.getenv("JWT_SECRET_KEY", "insecure-default-secret-key-change-in-production-min32")
+    )
+    jwt_algorithm: str = Field(default_factory=lambda: os.getenv("JWT_ALGORITHM", "HS256"))
+    jwt_access_token_expire_minutes: int = Field(
+        default_factory=lambda: int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+    )
+    admin_username: str = Field(default_factory=lambda: os.getenv("ADMIN_USERNAME", "admin"))
+    admin_password: str = Field(default_factory=lambda: os.getenv("ADMIN_PASSWORD", "AdminPass123!"))
+
+    # Rate Limiting & Brute-Force Protection (Stage 3)
+    rate_limit_enabled: bool = Field(
+        default_factory=lambda: os.getenv("RATE_LIMIT_ENABLED", "true").lower() in ("true", "1")
+    )
+    rate_limit_verify_per_minute: int = Field(
+        default_factory=lambda: int(os.getenv("RATE_LIMIT_VERIFY_PER_MINUTE", "60"))
+    )
+    rate_limit_identify_per_minute: int = Field(
+        default_factory=lambda: int(os.getenv("RATE_LIMIT_IDENTIFY_PER_MINUTE", "30"))
+    )
+    rate_limit_enroll_per_minute: int = Field(
+        default_factory=lambda: int(os.getenv("RATE_LIMIT_ENROLL_PER_MINUTE", "20"))
+    )
     
     # Storage Configuration (Supports 'local' or 'postgres')
     biometric_storage: str = Field(

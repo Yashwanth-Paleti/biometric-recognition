@@ -64,6 +64,7 @@ async def enroll_user(
             "INVALID_IMAGE",
             "INVALID_USER_ID",
             "INVALID_EMBEDDING",
+            "LIVENESS_CHECK_FAILED",
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -124,7 +125,7 @@ async def verify_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=result.message,
         )
-    if result.error_code in ("NO_FACE_DETECTED", "INVALID_IMAGE"):
+    if result.error_code in ("NO_FACE_DETECTED", "INVALID_IMAGE", "LIVENESS_CHECK_FAILED"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=result.message,
@@ -172,7 +173,7 @@ async def identify_user(
         device_id=device_id,
     )
 
-    if result.error_code in ("NO_FACE_DETECTED", "INVALID_IMAGE"):
+    if result.error_code in ("NO_FACE_DETECTED", "INVALID_IMAGE", "LIVENESS_CHECK_FAILED"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=result.message,
