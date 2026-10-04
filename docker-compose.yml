@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: biometric_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: biometrics
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d biometrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: biometric_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=development
+      - BIOMETRIC_STORAGE=postgres
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/biometrics
+      - BIOMETRIC_MATCH_THRESHOLD=0.85
+      - MODEL_NAME=buffalo_l
+      - MODEL_VERSION=1.0.0
+      - LOG_LEVEL=INFO
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.api.app:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  pgdata:
