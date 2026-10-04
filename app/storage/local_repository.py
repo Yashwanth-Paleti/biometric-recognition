@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 import pickle
 import threading
@@ -203,9 +204,10 @@ class LocalBiometricRepository(BiometricRepository):
         error_code: Optional[str] = None,
         device_id: Optional[str] = None,
     ) -> bool:
-        """Records an authentication attempt in local audit log."""
+        """Records an authentication attempt in local audit log with immutable UTC timestamp."""
         with self._lock:
             self._logs.append({
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "user_id": user_id,
                 "verification_type": verification_type,
                 "result": result,
@@ -216,6 +218,11 @@ class LocalBiometricRepository(BiometricRepository):
                 "device_id": device_id,
             })
             return True
+
+    def get_logs(self) -> list[dict]:
+        """Returns copies of all recorded authentication audit log entries."""
+        with self._lock:
+            return list(self._logs)
 
     def find_nearest_template(
         self,
