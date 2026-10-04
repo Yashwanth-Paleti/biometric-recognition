@@ -88,3 +88,17 @@ class ErrorResponse(BaseModel):
         default=None,
         description="Machine-readable domain error code (e.g. NO_FACE_DETECTED)",
     )
+
+
+class TokenResponse(BaseModel):
+    """OAuth2 JWT token response payload."""
+    access_token: str = Field(description="Signed JWT access token for Bearer authentication")
+    token_type: str = Field(default="bearer", description="Authentication scheme type")
+    expires_in: int = Field(description="Access token validity lifetime in seconds")
+
+
+class LoginRequest(BaseModel):
+    """Administrative credentials request payload."""
+    username: str = Field(description="Administrative username")
+    password: str = Field(description="Administrative secret password")
+

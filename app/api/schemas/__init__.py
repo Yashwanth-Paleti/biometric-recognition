@@ -3,6 +3,8 @@ from app.api.schemas.biometric import (
     ErrorResponse,
     HealthResponse,
     IdentificationResponse,
+    LoginRequest,
+    TokenResponse,
     VerificationResponse,
 )
 
@@ -12,4 +14,7 @@ __all__ = [
     "VerificationResponse",
     "IdentificationResponse",
     "ErrorResponse",
+    "TokenResponse",
+    "LoginRequest",
 ]
+

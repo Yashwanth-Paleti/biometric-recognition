@@ -1,17 +1,56 @@
+import secrets
 from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.security import OAuth2PasswordRequestForm
 
-from app.api.dependencies import get_biometric_service, validate_and_read_image
+from app.api.dependencies import get_biometric_service, get_current_admin, validate_and_read_image
 from app.api.schemas.biometric import (
     EnrollmentResponse,
     ErrorResponse,
     IdentificationResponse,
+    TokenResponse,
     VerificationResponse,
 )
+from app.config.settings import settings
 from app.services.biometric_service import BiometricService
 from app.utils.logging import logger
+from app.utils.security import create_access_token
 
 router = APIRouter(prefix="/auth", tags=["Biometric Authentication"])
+
+
+@router.post(
+    "/token",
+    response_model=TokenResponse,
+    summary="Obtain Administrative Access Token",
+    description="Authenticates administrative credentials and issues an HMAC-signed JWT Bearer access token.",
+    responses={
+        401: {"model": ErrorResponse, "description": "Invalid administrative credentials"},
+    },
+)
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+) -> TokenResponse:
+    username_valid = secrets.compare_digest(form_data.username, settings.admin_username)
+    password_valid = secrets.compare_digest(form_data.password, settings.admin_password)
+
+    if not (username_valid and password_valid):
+        logger.warning(f"Failed administrative login attempt for username: '{form_data.username}'")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    logger.info(f"Administrative access token issued for user '{form_data.username}'.")
+    access_token = create_access_token(
+        data={"sub": form_data.username, "role": "admin"}
+    )
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=settings.jwt_access_token_expire_minutes * 60,
+    )
 
 
 @router.post(
@@ -22,10 +61,11 @@ router = APIRouter(prefix="/auth", tags=["Biometric Authentication"])
     description=(
         "Enrolls a new 512-dimensional facial biometric template for a unique user. "
         "Enforces single-face detection and saves the template to PostgreSQL (or local fallback). "
-        "Raw face images are NOT stored in the database."
+        "Protected endpoint requiring administrative JWT Bearer authentication."
     ),
     responses={
-        400: {"model": ErrorResponse, "description": "Invalid image, missing face, or multiple faces"},
+        400: {"model": ErrorResponse, "description": "Invalid image, missing face, multiple faces, or liveness failure"},
+        401: {"model": ErrorResponse, "description": "Missing or invalid administrative JWT token"},
         500: {"model": ErrorResponse, "description": "Internal database or processing error"},
     },
 )
@@ -34,6 +74,7 @@ async def enroll_user(
     name: str = Form(..., description="Full display name of the user"),
     image: UploadFile = File(..., description="Face photograph for biometric enrollment"),
     service: BiometricService = Depends(get_biometric_service),
+    current_admin: dict = Depends(get_current_admin),
 ) -> EnrollmentResponse:
     clean_user_id = user_id.strip()
     clean_name = name.strip()

@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.app import app
-from app.api.dependencies import get_biometric_service
+from app.api.dependencies import get_biometric_service, get_current_admin
 from app.models.biometric import AuthenticationResult
 from app.services.biometric_service import BiometricService
 from app.storage.local_repository import LocalBiometricRepository
@@ -16,8 +16,11 @@ IMAGE_HARSH = BASE_DIR / "dataset" / "2_Harsh.jpg"
 
 @pytest.fixture
 def client():
-    """Provides a TestClient for the FastAPI app."""
-    return TestClient(app)
+    """Provides a TestClient for the FastAPI app with authenticated admin dependency."""
+    app.dependency_overrides[get_current_admin] = lambda: {"username": "admin", "role": "admin"}
+    yield TestClient(app)
+    app.dependency_overrides.pop(get_current_admin, None)
+
 
 
 # ============================================================================

@@ -8,6 +8,7 @@ from app.services.biometric_service import BiometricService
 from app.storage.base import BiometricRepository
 from app.storage.factory import get_biometric_repository
 from app.utils.logging import logger
+from app.utils.security import get_current_admin
 
 # Maximum permissible image payload size: 10 MB
 MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
