@@ -2,6 +2,7 @@ from functools import lru_cache
 from typing import Optional
 from fastapi import HTTPException, UploadFile, status
 
+from app.api.rate_limiter import RateLimiter, _global_limiter
 from app.biometric.exceptions import InvalidImageError
 from app.config.settings import settings
 from app.services.biometric_service import BiometricService
@@ -9,6 +10,12 @@ from app.storage.base import BiometricRepository
 from app.storage.factory import get_biometric_repository
 from app.utils.logging import logger
 from app.utils.security import get_current_admin
+
+# Route-specific rate limiter dependencies
+rate_limit_verify = RateLimiter("verify", times=settings.rate_limit_verify_per_minute, seconds=60)
+rate_limit_identify = RateLimiter("identify", times=settings.rate_limit_identify_per_minute, seconds=60)
+rate_limit_enroll = RateLimiter("enroll", times=settings.rate_limit_enroll_per_minute, seconds=60)
+rate_limit_token = RateLimiter("token", times=20, seconds=60)
 
 # Maximum permissible image payload size: 10 MB
 MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024

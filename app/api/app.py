@@ -68,6 +68,7 @@ def create_app() -> FastAPI:
                 detail=str(exc.detail),
                 error_code=f"HTTP_{exc.status_code}",
             ).model_dump(),
+            headers=exc.headers,
         )
 
     @app.exception_handler(Exception)

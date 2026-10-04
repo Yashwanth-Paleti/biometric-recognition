@@ -3,7 +3,15 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.api.dependencies import get_biometric_service, get_current_admin, validate_and_read_image
+from app.api.dependencies import (
+    get_biometric_service,
+    get_current_admin,
+    rate_limit_enroll,
+    rate_limit_identify,
+    rate_limit_token,
+    rate_limit_verify,
+    validate_and_read_image,
+)
 from app.api.schemas.biometric import (
     EnrollmentResponse,
     ErrorResponse,
@@ -22,10 +30,12 @@ router = APIRouter(prefix="/auth", tags=["Biometric Authentication"])
 @router.post(
     "/token",
     response_model=TokenResponse,
+    dependencies=[Depends(rate_limit_token)],
     summary="Obtain Administrative Access Token",
     description="Authenticates administrative credentials and issues an HMAC-signed JWT Bearer access token.",
     responses={
         401: {"model": ErrorResponse, "description": "Invalid administrative credentials"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
     },
 )
 async def login_for_access_token(
@@ -57,6 +67,7 @@ async def login_for_access_token(
     "/enroll",
     response_model=EnrollmentResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit_enroll)],
     summary="Enroll Biometric Identity",
     description=(
         "Enrolls a new 512-dimensional facial biometric template for a unique user. "
@@ -66,6 +77,7 @@ async def login_for_access_token(
     responses={
         400: {"model": ErrorResponse, "description": "Invalid image, missing face, multiple faces, or liveness failure"},
         401: {"model": ErrorResponse, "description": "Missing or invalid administrative JWT token"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
         500: {"model": ErrorResponse, "description": "Internal database or processing error"},
     },
 )
@@ -127,6 +139,7 @@ async def enroll_user(
 @router.post(
     "/verify",
     response_model=VerificationResponse,
+    dependencies=[Depends(rate_limit_verify)],
     summary="1:1 Biometric Verification",
     description=(
         "Performs 1:1 facial verification against enrolled templates of a claimed user ID. "
@@ -135,6 +148,7 @@ async def enroll_user(
     responses={
         400: {"model": ErrorResponse, "description": "Invalid image or no face detected"},
         404: {"model": ErrorResponse, "description": "Claimed user not found or not enrolled"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
         500: {"model": ErrorResponse, "description": "Internal database or processing error"},
     },
 )
@@ -190,6 +204,7 @@ async def verify_user(
 @router.post(
     "/identify",
     response_model=IdentificationResponse,
+    dependencies=[Depends(rate_limit_identify)],
     summary="1:N Biometric Identification",
     description=(
         "Performs 1:N facial search across the enrolled biometric gallery using pgvector similarity search. "
@@ -197,6 +212,7 @@ async def verify_user(
     ),
     responses={
         400: {"model": ErrorResponse, "description": "Invalid image or no face detected"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
         500: {"model": ErrorResponse, "description": "Internal database or processing error"},
     },
 )
